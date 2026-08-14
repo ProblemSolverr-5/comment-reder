@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cooment Reader</title>
+
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+  <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+  <script>window.tailwind = { config: { suppressDeprecationWarnings: true } };</script>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    html, body { background-color: #F4F8FA; }
+    * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    @keyframes fadeInUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+    .animate-fade-up { animation: fadeInUp 0.35s ease-out both; }
+    @keyframes pulseGlow { 0%,100%{box-shadow:0 0 0 0 rgba(249,115,22,.35);} 50%{box-shadow:0 0 0 8px rgba(249,115,22,0);} }
+    .analyze-pulse:hover { animation: pulseGlow 1.2s ease-out infinite; }
+    @keyframes spinSlow { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+    .spin-slow { animation: spinSlow 1.6s linear infinite; }
+    @keyframes checkPop { 0%{transform:scale(.4);opacity:0;} 60%{transform:scale(1.15);opacity:1;} 100%{transform:scale(1);opacity:1;} }
+    .check-pop { animation: checkPop 0.4s ease-out both; }
+    .brand-hover { transition: all 0.3s ease; }
+    .brand-hover:hover { background:linear-gradient(90deg,#C0C0C0,#FFD700,#C0C0C0); -webkit-background-clip:text; background-clip:text; color:transparent; filter:drop-shadow(0 0 6px rgba(250,204,21,.5)); }
+    .scrollbar-thin::-webkit-scrollbar{width:6px;} .scrollbar-thin::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:999px;}
+    @media(prefers-reduced-motion:reduce){.animate-fade-up,.analyze-pulse:hover,.spin-slow,.check-pop{animation:none!important;}}
+  </style>
+</head>
+<body class="bg-[#F4F8FA] text-[#1E293B] min-h-screen">
+<div id="root"></div>
+
+<script type="text/babel">
+  const { useState, useMemo, useEffect, useRef, useCallback } = React;
+  const { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } = window.Recharts || {};
+
+  // ── CONFIG ──────────────────────────────────────────────────────────
+  const API_BASE = "http://localhost:3001/v1";
+
+  const CATEGORY_META = {
+    all:         { label: "👁️ ALL",         base: "#0284C7" },
+    critical:    { label: "⚠️ CRITICAL",    base: "#B91C1C" },
+    suggestions: { label: "💡 SUGGESTIONS", base: "#D97706" },
+    questions:   { label: "❓ QUESTIONS",   base: "#4338CA" },
+    urgent:      { label: "🚨 URGENT",      base: "#D97706" },
+    business:    { label: "💸 BUSINESS",    base: "#047857" },
+    positive:    { label: "🙂 POSITIVE",    base: "#059669" },
+    spam:        { label: "😡 SPAM/HATE",   base: "#DC2626" },
+    sarcasm:     { label: "🤡 SARCASM",     base: "#7C3AED" },
+  };
+
+  const CATEGORY_COLORS = {
+    positive:"#059669", critical:"#B91C1C", questions:"#4338CA",
+    suggestions:"#D97706", urgent:"#D97706", business:"#047857",
+    spam:"#DC2626", sarcasm:"#7C3AED", neutral:"#64748B",
+  };
+
+  // ── HEADER ──────────────────────────────────────────────────────────
+  function Header({ view, setView, onReset }) {
+    return (
+      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-3 md:px-6 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 cursor-pointer brand-hover" onClick={onReset}>
+            <span className="text-2xl" style={{color:"#0EA5E9"}}>📊</span>
+            <span className="font-extrabold tracking-tight text-lg md:text-xl">
+              <span style={{color:"#0EA5E9"}}>COMMENT</span>{" "}
+              <span style={{color:"#1E293B"}}>INSIGHTS PRO</span>
+            </span>
+          </div>
+          {view === "results" && (
+            <button onClick={onReset} className="bg-[#FACC15] text-slate-900 font-medium text-sm px-4 py-2 rounded-lg hover:bg-[#D97706] hover:text-white transition-colors">
+              ＋ Analyze Another
+            </button>
+          )}
+        </div>
+      </header>
+    );
+  }
+
+  // ── HOME VIEW ───────────────────────────────────────────────────────
+  function HomeView({ onAnalyze }) {
+    const [url, setUrl] = useState("");
+    const features = [
+      { icon:"📈", title:"Core Analytics", desc:"Views, likes, growth and engagement ratio at a glance." },
+      { icon:"🧭", title:"Sentiment Categories", desc:"Positive, critical, questions, spam and more — auto-tagged by AI." },
+      { icon:"💬", title:"Discussion Insights", desc:"Surface urgent issues, business leads and top viewer requests." },
+    ];
+    return (
+      <div className="max-w-5xl mx-auto px-4 md:px-6 py-12 md:py-20 animate-fade-up">
+        <div className="text-center mb-10">
+          <h1 className="text-3xl md:text-5xl font-extrabold leading-tight text-[#1E293B] mb-4">
+            Analyze Any YouTube Video's <span style={{color:"#0EA5E9"}}>Audience Feedback</span> in Seconds
+          </h1>
+          <p className="text-slate-500 text-sm md:text-lg max-w-2xl mx-auto">
+            Paste a link, and Comment Insights Pro sorts every comment into the categories that actually matter.
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-stretch gap-3 max-w-2xl mx-auto mb-14">
+          <div className="relative flex-1">
+            <input type="text" value={url} onChange={e=>setUrl(e.target.value)}
+              onKeyDown={e=>e.key==="Enter" && url.trim() && onAnalyze(url.trim())}
+              placeholder="Paste YouTube URL here..."
+              className="w-full bg-white border-2 border-[#10B981] rounded-xl px-4 py-3 pr-10 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-shadow" />
+            {url && (
+              <button onClick={()=>setUrl("")} aria-label="Clear"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9CA3AF] hover:text-[#EF4444] font-bold">✕</button>
+            )}
+          </div>
+          <button onClick={()=>url.trim()&&onAnalyze(url.trim())}
+            className="analyze-pulse bg-[#F97316] text-white font-bold px-6 py-3 rounded-xl hover:bg-[#EA580C] transition-colors whitespace-nowrap">
+            ANALYZE 📊
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+          {features.map((f,i)=>(
+            <div key={i} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+              <div className="text-3xl mb-3">{f.icon}</div>
+              <h3 className="font-bold text-base mb-1">{f.title}</h3>
+              <p className="text-slate-500 text-sm">{f.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── LOADING VIEW ─────────────────────────────────────────────────────
+  function LoadingView({ progress }) {
+    const steps = [
+      "Fetching public video comments...",
+      "Running NLP sentiment analysis...",
+      "Extracting viewer questions & suggestions...",
+      "Building interactive dashboard...",
+    ];
+    const currentStep = progress?.step || 1;
+    return (
+      <div className="max-w-md mx-auto px-4 py-24 md:py-32 text-center animate-fade-up">
+        <div className="text-5xl mb-6 spin-slow inline-block">📊</div>
+        <h2 className="text-xl md:text-2xl font-bold mb-8 text-[#1E293B]">Analyzing your video...</h2>
+        <div className="space-y-4 text-left">
+          {steps.map((s,i)=>{
+            const stepNum = i+1;
+            const done = stepNum < currentStep;
+            const active = stepNum === currentStep;
+            return (
+              <div key={i} className="flex items-center gap-3">
+                <span className={"flex items-center justify-center w-6 h-6 rounded-md border-2 text-xs font-bold shrink-0 "+(done?"bg-emerald-500 border-emerald-500 text-white check-pop":active?"border-[#0EA5E9] text-[#0EA5E9]":"border-slate-300 text-slate-300")}>
+                  {done?"✓":""}
+                </span>
+                <span className={"text-sm "+(done?"text-slate-700":active?"text-[#1E293B] font-medium":"text-slate-400")}>{s}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // ── ERROR VIEW ───────────────────────────────────────────────────────
+  function ErrorView({ message, onReset }) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-24 md:py-32 text-center animate-fade-up">
+        <div className="text-6xl mb-6">⚠️</div>
+        <h2 className="text-xl md:text-2xl font-bold mb-2">Couldn't load that video</h2>
+        <p className="text-slate-500 text-sm mb-8">{message || "The link may be private, invalid, or age-restricted."}</p>
+        <button onClick={onReset} className="bg-[#F97316] text-white font-bold px-6 py-3 rounded-xl hover:bg-[#EA580C] transition-colors">
+          Try Another Link
+        </button>
+      </div>
+    );
+  }
+
+  // ── RESULTS VIEW ─────────────────────────────────────────────────────
+  function ResultsView({ jobId, data, onDismiss }) {
+    const [filter, setFilter] = useState("all");
+    const [showMetrics, setShowMetrics] = useState(true);
+    const [comments, setComments] = useState(data.comments || []);
+
+    const filtered = useMemo(()=>
+      filter==="all" ? comments : comments.filter(c=>c.category===filter),
+      [comments, filter]
+    );
+
+    const handleDismiss = async (commentId) => {
+      // Optimistic update
+      setComments(prev=>prev.filter(c=>c.id!==commentId));
+      try {
+        await fetch(`${API_BASE}/comments/${commentId}`, {
+          method:"DELETE",
+          headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({ job_id: jobId }),
+        });
+      } catch {}
+    };
+
+    // Build chart data from sentiment summary
+    const chartData = Object.entries(data.sentiment_summary || {})
+      .filter(([,v])=>v>0)
+      .map(([name,value])=>({
+        name: name.charAt(0).toUpperCase()+name.slice(1),
+        value,
+        color: CATEGORY_COLORS[name] || "#64748B"
+      }));
+
+    const video = data.video || {};
+    const filterOrder = ["all","critical","suggestions","questions","urgent","business","positive","spam","sarcasm"];
+
+    return (
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-10 animate-fade-up">
+        {/* Filter Toolbar */}
+        <div className="flex flex-wrap items-center gap-2 mb-6">
+          {filterOrder.map(key=>{
+            const meta = CATEGORY_META[key];
+            if(!meta) return null;
+            return (
+              <button key={key} onClick={()=>setFilter(key)}
+                style={{backgroundColor:meta.base}}
+                className={"text-white text-xs md:text-sm font-semibold px-3 py-1.5 rounded-full transition-transform hover:scale-105 "+(filter===key?"ring-2 ring-offset-2 ring-slate-800":"opacity-80 hover:opacity-100")}>
+                {meta.label}
+              </button>
+            );
+          })}
+          <button onClick={()=>setShowMetrics(m=>!m)}
+            className="ml-auto bg-[#64748B] text-white text-xs md:text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-[#334155] transition-colors">
+            ⚙️ METRICS
+          </button>
+        </div>
+
+        {/* Metrics */}
+        {showMetrics && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            {/* Video Card */}
+            <div className="bg-[#2563EB] text-white rounded-2xl p-5 shadow-sm">
+              <div className="flex gap-4">
+                {video.thumbnail_url ? (
+                  <img src={video.thumbnail_url} alt="thumb"
+                    className="w-24 h-16 md:w-28 md:h-20 rounded-lg object-cover shrink-0" />
+                ) : (
+                  <div className="w-24 h-16 md:w-28 md:h-20 rounded-lg bg-white/20 flex items-center justify-center text-2xl shrink-0">🎬</div>
+                )}
+                <div className="min-w-0">
+                  <h3 className="font-bold text-sm md:text-base truncate">{video.title || "—"}</h3>
+                  <p className="text-xs md:text-sm text-white/80 truncate">{video.channel || "—"}</p>
+                  <div className="flex gap-3 mt-2 text-xs md:text-sm font-semibold flex-wrap">
+                    <span>VIEWS: {video.views?.toLocaleString() || "—"}</span>
+                    <span>LIKES: {video.likes?.toLocaleString() || "—"}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Engagement Card */}
+            <div className="bg-[#F43F5E] text-white rounded-2xl p-5 shadow-sm flex flex-col justify-center">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs md:text-sm font-semibold">LIKES: {video.likes?.toLocaleString() || "—"}</span>
+                <span className="text-xs md:text-sm font-semibold">COMMENTS: {video.comment_count?.toLocaleString() || "—"}</span>
+              </div>
+              <div className="w-full bg-white/25 rounded-full h-2 mb-1">
+                <div className="bg-white h-2 rounded-full" style={{width:`${Math.min(video.engagement_ratio||0, 100)}%`}}></div>
+              </div>
+              <p className="text-xs text-white/85">Engagement Ratio: {video.engagement_ratio ?? "—"}%</p>
+            </div>
+
+            {/* Chart */}
+            {BarChart && chartData.length > 0 && (
+              <div className="bg-white shadow-md border border-slate-200 rounded-2xl p-5 md:col-span-2">
+                <h3 className="font-bold text-sm md:text-base mb-3">Sentiment Distribution</h3>
+                <div style={{width:"100%",height:220}}>
+                  <ResponsiveContainer>
+                    <BarChart data={chartData} margin={{top:4,right:8,left:-20,bottom:0}}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                      <XAxis dataKey="name" tick={{fontSize:11,fill:"#64748B"}} />
+                      <YAxis tick={{fontSize:11,fill:"#64748B"}} allowDecimals={false} />
+                      <Tooltip contentStyle={{borderRadius:8,fontSize:12}} />
+                      <Bar dataKey="value" radius={[6,6,0,0]}>
+                        {chartData.map((d,i)=><Cell key={i} fill={d.color}/>)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {/* Keywords */}
+            {data.keywords?.length > 0 && (
+              <div className="bg-white shadow-md border border-slate-200 rounded-2xl p-5">
+                <h3 className="font-bold text-sm md:text-base mb-3">Topic Keywords</h3>
+                <div className="flex flex-wrap gap-2">
+                  {data.keywords.map((k,i)=>(
+                    <span key={i} className="text-xs md:text-sm px-3 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200"
+                      style={{fontSize:11+(i%3)*2}}>#{k}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Comments Feed */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-base md:text-lg">
+              Comments Feed <span className="text-slate-400 font-normal text-sm">({filtered.length} active)</span>
+            </h3>
+          </div>
+          <div className="space-y-3 max-h-[600px] overflow-y-auto scrollbar-thin pr-1">
+            {filtered.length === 0 ? (
+              <div className="text-center py-16 text-slate-400 text-sm">No comments in this category right now.</div>
+            ) : (
+              filtered.map(c=>{
+                const meta = CATEGORY_META[c.category] || CATEGORY_META.all;
+                return (
+                  <div key={c.id} className="relative bg-[#F1F5F9] border border-[#CBD5E1] rounded-xl p-4 pr-10 animate-fade-up">
+                    <div className="flex items-start gap-3">
+                      {c.avatar_url ? (
+                        <img src={c.avatar_url} alt={c.user}
+                          className="w-9 h-9 rounded-full object-cover shrink-0 border border-slate-200" />
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center text-lg shrink-0 border border-slate-200">👤</div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <span className="font-semibold text-sm">{c.user}</span>
+                          <span className="text-xs text-slate-400">{c.time_ago}</span>
+                          <span style={{backgroundColor:meta.base}}
+                            className="text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{meta.label}</span>
+                        </div>
+                        <p className="text-sm text-slate-700 break-words">{c.body}</p>
+                        <div className="flex items-center gap-1 mt-2 text-xs text-slate-400">
+                          <span>👍</span><span>{c.likes}</span>
+                          {c.reply_count>0 && <span className="ml-2">💬 {c.reply_count} replies</span>}
+                        </div>
+                      </div>
+                    </div>
+                    <button onClick={()=>handleDismiss(c.id)} aria-label="Dismiss"
+                      className="absolute bottom-3 right-3 text-[#94A3B8] hover:text-[#EF4444] transition-colors font-bold text-sm">✕</button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── APP ROOT ─────────────────────────────────────────────────────────
+  function App() {
+    const [view, setView] = useState("home");      // home | loading | results | error
+    const [progress, setProgress] = useState(null);
+    const [jobId, setJobId] = useState(null);
+    const [resultData, setResultData] = useState(null);
+    const [errorMsg, setErrorMsg] = useState("");
+    const pollRef = useRef(null);
+
+    const stopPolling = () => {
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+    };
+
+    const handleReset = useCallback(() => {
+      stopPolling();
+      setView("home");
+      setJobId(null);
+      setResultData(null);
+      setProgress(null);
+      setErrorMsg("");
+    }, []);
+
+    const handleAnalyze = useCallback(async (url) => {
+      stopPolling();
+      setView("loading");
+      setProgress({ step: 1, label: "Fetching public video comments..." });
+
+      let res, json;
+      try {
+        res = await fetch(`${API_BASE}/analyze`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+        json = await res.json();
+      } catch (err) {
+        setErrorMsg("Could not reach the server. Is the backend running on port 3001?");
+        setView("error");
+        return;
+      }
+
+      if (!res.ok) {
+        setErrorMsg(json.message || "Invalid request.");
+        setView("error");
+        return;
+      }
+
+      const jid = json.job_id;
+      setJobId(jid);
+
+      // Poll for results
+      pollRef.current = setInterval(async () => {
+        try {
+          const r = await fetch(`${API_BASE}/results/${jid}`);
+          const data = await r.json();
+
+          if (data.status === "processing") {
+            setProgress(data.progress);
+          } else if (data.status === "complete") {
+            stopPolling();
+            setResultData(data);
+            setView("results");
+          } else if (data.status === "failed") {
+            stopPolling();
+            setErrorMsg(data.message || "Analysis failed.");
+            setView("error");
+          }
+        } catch {
+          stopPolling();
+          setErrorMsg("Lost connection to the server.");
+          setView("error");
+        }
+      }, 1500);
+    }, []);
+
+    useEffect(() => () => stopPolling(), []);
+
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header view={view} onReset={handleReset} />
+        <main className="flex-1">
+          {view==="home"    && <HomeView onAnalyze={handleAnalyze} />}
+          {view==="loading" && <LoadingView progress={progress} />}
+          {view==="results" && <ResultsView jobId={jobId} data={resultData} />}
+          {view==="error"   && <ErrorView message={errorMsg} onReset={handleReset} />}
+        </main>
+        <footer className="text-center text-xs text-slate-400 py-6">
+          Comment Reader
+        </footer>
+      </div>
+    );
+  }
+
+  const root = ReactDOM.createRoot(document.getElementById("root"));
+  root.render(<App />);
+</script>
+</body>
+</html>
