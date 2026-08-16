@@ -1,4 +1,5 @@
 const Queue = require("better-queue");
+const MemoryStore = require("better-queue-memory"); // 1. Require explicitly
 const { updateJob } = require("../db/jobStore");
 const { fetchVideoMetadata, fetchComments } = require("../services/youtube.service");
 const {
@@ -7,10 +8,6 @@ const {
   extractKeywords,
 } = require("../services/sentiment.service");
 
-/**
- * The analysis queue processes one job at a time.
- * Each job runs through 4 steps mirroring the frontend loading screen.
- */
 const analysisQueue = new Queue(
   async function (task, done) {
     const { jobId, videoId } = task;
@@ -45,7 +42,6 @@ const analysisQueue = new Queue(
       try {
         rawComments = await fetchComments(videoId, 300);
       } catch (err) {
-        // Comments disabled — continue with empty array
         console.warn(`Comments unavailable for ${videoId}:`, err.message);
       }
 
@@ -60,7 +56,6 @@ const analysisQueue = new Queue(
       let classifiedComments = rawComments;
       if (rawComments.length > 0) {
         const classifications = await classifyComments(rawComments);
-        // Merge category back into comment objects
         const categoryMap = new Map(classifications.map((c) => [c.id, c.category]));
         classifiedComments = rawComments.map((c) => ({
           ...c,
@@ -97,7 +92,8 @@ const analysisQueue = new Queue(
     }
   },
   {
-    concurrent: 2,     // Process 2 jobs at a time
+    store: new MemoryStore(), // 2. Pass store instance directly
+    concurrent: 2,
     maxRetries: 1,
     retryDelay: 2000,
   }
