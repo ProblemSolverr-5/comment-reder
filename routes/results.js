@@ -13,6 +13,9 @@ const { getJob } = require("../db/jobStore");
  *   status: "complete"   → full results ready to render
  *   status: "failed"     → show error view
  */
+router.get('/', (req, res) => {
+    res.send('Result route is working. Please provide a jobId to get specific results.');
+});
 router.get("/:jobId", (req, res) => {
   const { jobId } = req.params;
   const job = getJob(jobId);
