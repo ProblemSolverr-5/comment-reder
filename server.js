@@ -27,8 +27,8 @@ const ALLOWED_ORIGINS = [
   "http://127.0.0.1:3001",
   "https://commentreaderr.com",
   "https://www.commentreaderr.com",
+  "https://your-railway-url.up.railway.app"
 ];
-
 app.use(
   cors({
     origin: function (origin, callback) {
