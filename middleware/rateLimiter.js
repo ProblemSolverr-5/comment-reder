@@ -1,9 +1,9 @@
-const rateLimit = require("express-rate-limit");
+const { rateLimit } = require("express-rate-limit");
 
 const limiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 30,
-  validate:false,
+  validate: { trustProxy: false },
   standardHeaders: true,
   legacyHeaders: false,
   message: {
