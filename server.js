@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
+const path = require("path");                          // ← added
 const rateLimiter = require("./middleware/rateLimiter");
 
 const analyzeRouter = require("./routes/analyze");
@@ -13,9 +14,8 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 app.set('trust proxy', 1);
 
-app.get('/', (req, res) => {
-    res.status(200).send('Server is running and healthy!');
-});
+// ── Static Frontend ──────────────────────────────────────────────────
+app.use(express.static(path.join(__dirname, "frontend"))); // ← added
 
 // ── CORS ─────────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = [
@@ -46,7 +46,7 @@ app.use(express.json());
 // ── Rate Limiting ────────────────────────────────────────────────────
 app.use(rateLimiter);
 
-// ── Routes ───────────────────────────────────────────────────────────
+// ── API Routes ───────────────────────────────────────────────────────
 app.use("/v1/analyze", analyzeRouter);
 app.use("/v1/results", resultsRouter);
 app.use("/v1/comments", commentsRouter);
@@ -61,6 +61,11 @@ app.get("/health", (req, res) => {
       gemini_key: !!process.env.GEMINI_API_KEY,
     },
   });
+});
+
+// ── Serve Frontend ───────────────────────────────────────────────────
+app.get("/", (req, res) => {                           // ← replaced old root route
+  res.sendFile(path.join(__dirname, "frontend", "index.html"));
 });
 
 // ── 404 Handler ──────────────────────────────────────────────────────
