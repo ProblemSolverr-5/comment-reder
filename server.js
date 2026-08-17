@@ -27,7 +27,7 @@ const ALLOWED_ORIGINS = [
   "http://127.0.0.1:3001",
   "https://commentreaderr.com",
   "https://www.commentreaderr.com",
-  "https://your-railway-url.up.railway.app"
+  "https://comment-rederr-production.up.railway.app/" // <- Yahan real URL paste karein
 ];
 app.use(
   cors({
