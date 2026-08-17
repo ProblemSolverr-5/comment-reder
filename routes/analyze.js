@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { v4: uuidv4 } = require("uuid");
-const { extractVideoId } = require("../services/youtube_service");
+const { extractVideoId } = require("../services/youtube.service");
 const { createJob } = require("../db/jobStore");
 const analysisQueue = require("../workers/analysisQueue");
 
