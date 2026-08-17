@@ -1,19 +1,18 @@
 const Queue = require("better-queue");
 const MemoryStore = require("better-queue-memory");
 const { updateJob } = require("../db/jobStore");
-const { fetchVideoMetadata, fetchComments } = require("../services/youtube_service");
+const { fetchVideoMetadata, fetchComments } = require("../services/youtube.service");
 const {
   classifyComments,
   buildSentimentSummary,
   extractKeywords,
-} = require("../services/sentiment_service");
+} = require("../services/sentiment.service");
 
 const analysisQueue = new Queue(
   async function (task, done) {
     const { jobId, videoId } = task;
 
     try {
-      // ── STEP 1: Fetch video metadata ────────────────────────────────
       updateJob(jobId, {
         progress: { step: 1, label: "Fetching public video comments..." },
       });
@@ -33,7 +32,6 @@ const analysisQueue = new Queue(
         throw err;
       }
 
-      // ── STEP 2: Fetch comments ───────────────────────────────────────
       updateJob(jobId, {
         progress: { step: 2, label: "Running NLP sentiment analysis..." },
       });
@@ -45,7 +43,6 @@ const analysisQueue = new Queue(
         console.warn(`Comments unavailable for ${videoId}:`, err.message);
       }
 
-      // ── STEP 3: AI classification ────────────────────────────────────
       updateJob(jobId, {
         progress: {
           step: 3,
@@ -63,7 +60,6 @@ const analysisQueue = new Queue(
         }));
       }
 
-      // ── STEP 4: Build summary + keywords ────────────────────────────
       updateJob(jobId, {
         progress: { step: 4, label: "Building interactive dashboard..." },
       });
@@ -71,7 +67,6 @@ const analysisQueue = new Queue(
       const sentimentSummary = buildSentimentSummary(classifiedComments);
       const keywords = await extractKeywords(classifiedComments);
 
-      // ── COMPLETE ─────────────────────────────────────────────────────
       updateJob(jobId, {
         status: "complete",
         video: videoData,
