@@ -3,7 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const path = require("path");                          // ← added
+const path = require("path");
 const rateLimiter = require("./middleware/rateLimiter");
 
 const analyzeRouter = require("./routes/analyze");
@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 3001;
 app.set('trust proxy', 1);
 
 // ── Static Frontend ──────────────────────────────────────────────────
-app.use(express.static(path.join(__dirname, "frontend"))); // ← added
+app.use(express.static(path.join(__dirname, "frontend")));
 
 // ── CORS ─────────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = [
@@ -23,6 +23,8 @@ const ALLOWED_ORIGINS = [
   "http://127.0.0.1:5500",
   "http://localhost:3000",
   "http://127.0.0.1:3000",
+  "http://localhost:3001",
+  "http://127.0.0.1:3001",
   "https://commentreaderr.com",
   "https://www.commentreaderr.com",
 ];
@@ -40,7 +42,10 @@ app.use(
 );
 
 // ── Security & Parsing ───────────────────────────────────────────────
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+}));
 app.use(express.json());
 
 // ── Rate Limiting ────────────────────────────────────────────────────
@@ -64,7 +69,7 @@ app.get("/health", (req, res) => {
 });
 
 // ── Serve Frontend ───────────────────────────────────────────────────
-app.get("/", (req, res) => {                           // ← replaced old root route
+app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "frontend", "index.html"));
 });
 
