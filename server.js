@@ -11,7 +11,7 @@ const commentsRouter = require("./routes/comments");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-app.set('trust proxy', flase);
+app.set('trust proxy', false);
 
 // ── CORS ─────────────────────────────────────────────────────────────
 // Allow both localhost and 127.0.0.1 — browsers use either depending
