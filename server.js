@@ -74,7 +74,6 @@ app.use((err, req, res, _next) => {
 });
 
 // ── Start ─────────────────────────────────────────────────────────────
-app.set('trust proxy', true);
 app.listen(PORT, '0.0.0.0', () => {
   console.log("\n╔════════════════════════════════════════╗");
   console.log("║   Comment Insights Pro — Backend       ║");
