@@ -11,8 +11,10 @@ const commentsRouter = require("./routes/comments");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-app.set('trust proxy', false);
-
+app.set('trust proxy', 1);
+app.get('/', (req, res) => {
+    res.status(200).send('Server is running and healthy!');
+});
 // ── CORS ─────────────────────────────────────────────────────────────
 // Allow both localhost and 127.0.0.1 — browsers use either depending
 // on how Live Server opens the file
