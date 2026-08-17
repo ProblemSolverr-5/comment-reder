@@ -1,12 +1,12 @@
 const Queue = require("better-queue");
-const MemoryStore = require("better-queue-memory"); // 1. Require explicitly
+const MemoryStore = require("better-queue-memory");
 const { updateJob } = require("../db/jobStore");
-const { fetchVideoMetadata, fetchComments } = require("../services/youtube.service");
+const { fetchVideoMetadata, fetchComments } = require("../services/youtube_service");
 const {
   classifyComments,
   buildSentimentSummary,
   extractKeywords,
-} = require("../services/sentiment.service");
+} = require("../services/sentiment_service");
 
 const analysisQueue = new Queue(
   async function (task, done) {
@@ -92,7 +92,7 @@ const analysisQueue = new Queue(
     }
   },
   {
-    store: new MemoryStore(), // 2. Pass store instance directly
+    store: new MemoryStore(),
     concurrent: 2,
     maxRetries: 1,
     retryDelay: 2000,

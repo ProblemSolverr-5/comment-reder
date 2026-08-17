@@ -1,8 +1,9 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-// gemini-1.5-flash is fast, cheap, and great for classification tasks
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+
+// switched from gemini-1.5-pro to flash — faster and cheaper
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 const VALID_CATEGORIES = [
   "positive",
@@ -19,7 +20,6 @@ const VALID_CATEGORIES = [
 /**
  * Classify a batch of comments using Gemini.
  * We send up to 50 comments per request to stay within token limits.
- * Returns an array of { id, category } objects.
  */
 async function classifyComments(comments) {
   const results = [];
@@ -61,18 +61,15 @@ Use exactly the IDs from the [ID:...] tags. Use only the category names listed a
   try {
     const result = await model.generateContent(prompt);
     const raw = result.response.text().trim();
-    // Strip any accidental markdown fences Gemini sometimes adds
     const clean = raw.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(clean);
 
-    // Validate each result
     return parsed.map((item) => ({
       id: item.id,
       category: VALID_CATEGORIES.includes(item.category) ? item.category : "neutral",
     }));
   } catch (err) {
     console.error("Sentiment classification error:", err.message);
-    // Fallback: mark all as neutral if AI fails
     return comments.map((c) => ({ id: c.id, category: "neutral" }));
   }
 }
@@ -106,7 +103,6 @@ function buildSentimentSummary(comments) {
 async function extractKeywords(comments) {
   if (comments.length === 0) return [];
 
-  // Sample up to 100 comment bodies for keyword extraction
   const sample = comments
     .slice(0, 100)
     .map((c) => c.body)

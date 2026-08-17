@@ -12,23 +12,24 @@ const commentsRouter = require("./routes/comments");
 const app = express();
 const PORT = process.env.PORT || 3001;
 app.set('trust proxy', 1);
+
 app.get('/', (req, res) => {
     res.status(200).send('Server is running and healthy!');
 });
+
 // ── CORS ─────────────────────────────────────────────────────────────
-// Allow both localhost and 127.0.0.1 — browsers use either depending
-// on how Live Server opens the file
 const ALLOWED_ORIGINS = [
   "http://localhost:5500",
   "http://127.0.0.1:5500",
   "http://localhost:3000",
   "http://127.0.0.1:3000",
+  "https://commentreaderr.com",
+  "https://www.commentreaderr.com",
 ];
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (Postman, curl, health checks)
       if (!origin) return callback(null, true);
       if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
       callback(new Error("CORS: origin not allowed — " + origin));

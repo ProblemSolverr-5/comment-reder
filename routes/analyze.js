@@ -1,16 +1,13 @@
 const express = require("express");
 const router = express.Router();
 const { v4: uuidv4 } = require("uuid");
-const { extractVideoId } = require("../services/youtube.service");
+const { extractVideoId } = require("../services/youtube_service");
 const { createJob } = require("../db/jobStore");
 const analysisQueue = require("../workers/analysisQueue");
 
 /**
  * POST /analyze
  * Body: { url: "https://www.youtube.com/watch?v=..." }
- *
- * Validates the URL, creates a job, enqueues background processing,
- * and immediately returns the job_id.
  */
 router.post("/", async (req, res) => {
   const { url } = req.body;
@@ -43,7 +40,6 @@ router.post("/", async (req, res) => {
   const jobId = `job_${uuidv4().replace(/-/g, "").slice(0, 12)}`;
   createJob(jobId, url.trim());
 
-  // Push to background queue (non-blocking)
   analysisQueue.push({ jobId, videoId });
 
   return res.status(202).json({
