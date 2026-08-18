@@ -17,6 +17,7 @@ app.set('trust proxy', 1);
 // ── Static Frontend ──────────────────────────────────────────────────
 app.use(express.static(path.join(__dirname, "frontend")));
 
+
 // ── CORS ─────────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = [
   "http://localhost:5500",
