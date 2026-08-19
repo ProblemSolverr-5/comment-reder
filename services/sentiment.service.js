@@ -57,7 +57,7 @@ RESPOND WITH ONLY valid JSON — no explanation, no markdown fences. Format:
 [{"id":"COMMENT_ID","category":"CATEGORY"},...]
 
 Use exactly the IDs from the [ID:...] tags. Use only the category names listed above.`;
-
+result = await model.generateContent(prompt);
   try {
     const result = await model.generateContent(prompt);
     const raw = result.response.text().trim();
