@@ -2,24 +2,11 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// switched from gemini-1.5-pro to flash — faster and cheaper
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-const VALID_CATEGORIES = [
-  "positive",
-  "critical",
-  "questions",
-  "suggestions",
-  "urgent",
-  "business",
-  "spam",
-  "sarcasm",
-  "neutral",
-];
 
 /**
  * Classify a batch of comments using Gemini.
- * We send up to 50 comments per request to stay within token limits.
+ * Gemini freely decides the category based on comment meaning.
  */
 async function classifyComments(comments) {
   const results = [];
@@ -35,29 +22,25 @@ async function classifyComments(comments) {
 }
 
 async function classifyBatch(comments) {
-  const input = comments.map((c, idx) => `${idx + 1}. [ID:${c.id}] ${c.body}`).join("\n");
+  const input = comments
+    .map((c, idx) => `${idx + 1}. [ID:${c.id}] ${c.body}`)
+    .join("\n");
 
-  const prompt = `You are a YouTube comment classifier. Classify each comment below into EXACTLY one category.
+  const prompt = `You are an expert YouTube comment analyst. Your job is to read each comment carefully and assign it a single descriptive category that best captures its meaning, intent, and tone.
 
-CATEGORIES:
-- positive     → praise, thanks, love, enthusiasm, encouragement
-- critical     → complaints, audio/video issues, factual errors, disappointment
-- questions    → asking anything (how, what, why, when, where)
-- suggestions  → requesting new content, features, improvements
-- urgent       → broken links, errors, time-sensitive issues that need creator action
-- business     → sponsorship offers, collaboration, brand deals, affiliate mentions
-- spam         → ads, self-promotion, bots, irrelevant links, repetitive caps
-- sarcasm      → jokes, irony, memes, backhanded compliments
-- neutral      → off-topic, general statements, neither positive nor negative
+Do NOT use a fixed list. Instead, derive the category naturally from what the commenter is actually expressing. The category should be:
+- A short lowercase phrase (1–3 words, no punctuation)
+- Descriptive and specific enough to be meaningful (e.g. "technical issue", "genuine praise", "feature request", "confused viewer", "spam link", "sarcastic joke", "collaboration offer")
+- Consistent — similar comments should get the same category label
 
-COMMENTS TO CLASSIFY:
+COMMENTS:
 ${input}
 
 RESPOND WITH ONLY valid JSON — no explanation, no markdown fences. Format:
-[{"id":"COMMENT_ID","category":"CATEGORY"},...]
+[{"id":"COMMENT_ID","category":"your derived category"},...]
 
-Use exactly the IDs from the [ID:...] tags. Use only the category names listed above.`;
-result = await model.generateContent(prompt);
+Use exactly the IDs from the [ID:...] tags.`;
+
   try {
     const result = await model.generateContent(prompt);
     const raw = result.response.text().trim();
@@ -66,33 +49,27 @@ result = await model.generateContent(prompt);
 
     return parsed.map((item) => ({
       id: item.id,
-      category: VALID_CATEGORIES.includes(item.category) ? item.category : "neutral",
+      // Normalize: lowercase, trim, collapse spaces
+      category:
+        typeof item.category === "string" && item.category.trim().length > 0
+          ? item.category.trim().toLowerCase().replace(/\s+/g, " ")
+          : "uncategorized",
     }));
   } catch (err) {
     console.error("Sentiment classification error:", err.message);
-    return comments.map((c) => ({ id: c.id, category: "neutral" }));
+    return comments.map((c) => ({ id: c.id, category: "uncategorized" }));
   }
 }
 
 /**
  * Build sentiment summary counts from classified comments.
+ * Since categories are now dynamic, this groups by whatever labels Gemini returned.
  */
 function buildSentimentSummary(comments) {
-  const summary = {
-    positive: 0,
-    critical: 0,
-    questions: 0,
-    suggestions: 0,
-    urgent: 0,
-    business: 0,
-    spam: 0,
-    sarcasm: 0,
-    neutral: 0,
-  };
+  const summary = {};
   for (const c of comments) {
-    if (summary[c.category] !== undefined) {
-      summary[c.category]++;
-    }
+    const cat = c.category || "uncategorized";
+    summary[cat] = (summary[cat] || 0) + 1;
   }
   return summary;
 }
@@ -117,7 +94,11 @@ ${sample}`;
 
   try {
     const result = await model.generateContent(prompt);
-    const raw = result.response.text().trim().replace(/```json|```/g, "").trim();
+    const raw = result.response
+      .text()
+      .trim()
+      .replace(/```json|```/g, "")
+      .trim();
     const keywords = JSON.parse(raw);
     return Array.isArray(keywords) ? keywords.slice(0, 8) : [];
   } catch {
