@@ -2,7 +2,21 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+// Retry helper — exponential backoff
+async function withRetry(fn, retries = 3, delayMs = 1000) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const isLast = attempt === retries;
+      console.warn(`Attempt ${attempt} failed: ${err.message}${isLast ? " — giving up." : " — retrying..."}`);
+      if (isLast) throw err;
+      await new Promise((res) => setTimeout(res, delayMs * attempt)); // exponential: 1s, 2s, 3s
+    }
+  }
+}
 
 /**
  * Classify a batch of comments using Gemini.
@@ -42,21 +56,21 @@ RESPOND WITH ONLY valid JSON — no explanation, no markdown fences. Format:
 Use exactly the IDs from the [ID:...] tags.`;
 
   try {
-    const result = await model.generateContent(prompt);
+    // Wrap the Gemini call in withRetry
+    const result = await withRetry(() => model.generateContent(prompt));
     const raw = result.response.text().trim();
     const clean = raw.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(clean);
 
     return parsed.map((item) => ({
       id: item.id,
-      // Normalize: lowercase, trim, collapse spaces
       category:
         typeof item.category === "string" && item.category.trim().length > 0
           ? item.category.trim().toLowerCase().replace(/\s+/g, " ")
           : "uncategorized",
     }));
   } catch (err) {
-    console.error("Sentiment classification error:", err.message);
+    console.error("Sentiment classification failed after retries:", err.message);
     return comments.map((c) => ({ id: c.id, category: "uncategorized" }));
   }
 }
@@ -93,7 +107,8 @@ COMMENTS:
 ${sample}`;
 
   try {
-    const result = await model.generateContent(prompt);
+    // Retry for keyword extraction too
+    const result = await withRetry(() => model.generateContent(prompt));
     const raw = result.response
       .text()
       .trim()
